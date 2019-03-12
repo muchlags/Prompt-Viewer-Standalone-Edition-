@@ -1,0 +1,785 @@
+<html>
+
+	<head>
+
+		<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+
+		<title>Prompter - Standalone Edition</title>
+<!-- 
+		<link rel="stylesheet" type="text/css" href="./Repo/main.css" />
+ -->
+		<style>
+			#thecontents{
+				text-align: left;
+				height: 91.25%;
+				width: 90%;
+				margin: auto;
+				margin-top:13px;
+				margin-left: 6%;
+				padding-right: 2%;
+				overflow:auto;
+				color: black;
+				font-size: 50;
+				font-weight:bold;
+				font-family: "Garamond";
+				text-shadow: 1px 1px 1px #aaa;
+				z-index: 1;
+
+			}
+
+			.defaultButton{
+				cursor:default; 
+				padding: 3px 8px;
+				font: 13.3333px Arial;
+				-webkit-appearance: push-button;
+				
+			}
+
+			body{
+				padding:0;
+				margin:0;
+				/*background: url('./bg.png');*/
+				/* For browsers that do not support gradients */
+   				background-color: red;
+   				/* Standard syntax (must be last) */
+   				background-image: linear-gradient(to right,
+   					rgb(72,190,252),
+   					rgb(197, 235, 254),
+   					rgb(229, 246, 254),
+   					white,
+   					rgb(229, 246, 254),
+					rgb(197, 235, 254),
+					rgb(72,190,252)
+				);
+				background-size: contain;
+
+			}
+
+			#ctrlHolder{
+				opacity: 0.25;
+				transition: .5s;
+
+			}
+
+			#ctrlHolder:hover{
+				opacity: 1;
+
+			}
+
+			#size{
+				/*
+				position:absolute;
+				bottom:0;
+				*/
+				margin:0;
+				padding:0;
+				margin-top:7px;
+
+			}
+
+
+
+			.grabbable {
+			    cursor: move; /* fallback if grab cursor is unsupported */
+			    cursor: grab;
+			    cursor: -moz-grab;
+			    cursor: -webkit-grab;
+
+			}
+
+			 /* (Optional) Apply a "closed-hand" cursor during drag operation. */
+			.grabbable:active { 
+			    cursor: grabbing;
+			    cursor: -moz-grabbing;
+			    cursor: -webkit-grabbing;
+
+			}
+			
+			#canvasContainer{
+				position:absolute;
+				height:500px;
+				width: 1000px;
+				z-index:1;
+				background-image:url('pac500.gif');
+
+			}
+
+			.div2{
+				position:absolute;
+				top:100px;
+				left:100px;
+				height:100px;
+				width:100px;
+				z-index:2;
+				overflow:hidden;
+				display:block;
+				border: 5px solid red;
+
+			}
+
+			.noselect{
+				  -webkit-touch-callout: none; /* iOS Safari */
+				    -webkit-user-select: none; /* Safari */
+				     -khtml-user-select: none; /* Konqueror HTML */
+				       -moz-user-select: none; /* Firefox */
+				        -ms-user-select: none; /* Internet Explorer/Edge */
+				            user-select: none; /* Non-prefixed version, currently supported by Chrome and Opera */
+
+			}
+		</style>
+
+
+	</head>
+
+
+
+	<body align="center">
+
+		
+
+		<br>
+
+		<!-- <div id="thecontents" spellcheck="false" class="noselect grabbable" unselectable="on" contenteditable="true" style="font-size: 50px;"></div> -->
+		<div id="thecontents" spellcheck="false" contenteditable="true" style="font-size: 50px;"></div>
+
+		<div id="ctrlHolder">
+			<!-- <input type="button" value="Reset Colors" name=""> -->
+			<input type="color" id="bg" value="#48befc">
+			<input type="color" id="fg" value="#000000">
+			<input type="button" id="b2t" value="Back to Top">
+			<select id="textAlignment">
+				<option value="left">Left</option>
+				<option value="center">Center</option>
+				<option value="right">Right</option>
+			</select>
+			<input id="size" type="number" class="thesize" value="50">
+			<input id="panToggle" type="button" value="Pan Mode: Off">
+			<input type="button" id="scrollBarToggle" value="Scroll Bar: Visible" style="margin-bottom: -200px;" />
+			<!-- <input type="button" id="scrollBarToggle" value="Scroll Bar: Visible" style="margin-bottom: -200px;" /> -->
+			<a id='saveFile' class="defaultButton">Save</a>
+			<label for="openFile" class="defaultButton">Load</label>
+			<input type="file" id="openFile" title=" " style="width: 0;opacity: 0;" accept=".txt" />
+
+		</div>
+
+	</body>
+
+
+    <script type="text/javascript">
+	    function removeFirstChar(selector){
+	    	return selector.slice(1, selector.length);
+	    }
+
+	    function $(selector){
+	    	return document.getElementById(removeFirstChar(selector));
+	    }
+
+
+  		function bindEvent(selector, evt, fn){
+			var flag = selector.slice(0, 1);
+			var selector = removeFirstChar(selector);
+
+			if (flag == "#") {
+				document.getElementById(selector).addEventListener(evt, fn);
+			}else if (flag == ".") {
+				var objList = document.getElementsByClassName(selector);
+
+				// will not work since return value of document.getElementsByClassName() is not real array
+				// objList.forEach(function(item){
+				// 	return item;
+				// });
+
+				for(i = 0; i < objList.length; i++) {
+					// alert(i); 
+					 objList[i].addEventListener(evt, fn);               
+			  		// (function(i){
+			    // 		objList[i].addEventListener('click', function () { 
+			    //     		// function code here
+			        		// alert(i);           
+			    // 		});                        
+			  		// })
+
+			  		// (i) 
+				}
+
+
+				//return document.getElementsByClassName(val);
+			}
+		}//end of bindEvent function
+
+		
+		var curYPos, curXPos, curDown, startX, startY;
+
+		dragArea = document.getElementById('thecontents');
+		// alert(panStatus);
+		dragArea.addEventListener('mousemove', function(event){ 
+
+			panStatus = document.getElementById('panToggle').value;
+		 	if(curDown && panStatus == "Pan Mode: On"){
+		    	
+		    	//format: scroll position
+		    	//			is equal to current position
+		    	//			plus starting mouse down position
+		    	//			minus current moved mouse position
+
+		    	dragArea.scrollTop = curYPos + (startY - event.clientY);
+		    	dragArea.scrollLeft = curXPos + (startX - event.clientX);
+
+		  	}
+
+		});
+
+		dragArea.addEventListener('mousedown', function(event){ 
+
+		    startX = event.clientX;
+		    startY = event.clientY;
+			curYPos = dragArea.scrollTop; 
+			curXPos = dragArea.scrollLeft; 
+			curDown = true; 
+			//alert();
+
+		});
+
+		dragArea.addEventListener('mouseup', function(event){ 
+			curDown = false; 
+		});
+
+		/*
+		element.clientHeight - is the pixels that you see in your browser.
+		var a = element.scrollTop; will be the position.
+		var b = element.scrollHeight - element.clientHeight; will be the maximum value for scrollTop.
+		var c = a / b; will be the percent of scroll [from 0 to 1].
+		*/
+
+		// var _startX = 0;
+		// var _startY = 0;
+		// var _offsetX = 0;           
+		// var _offsetY = 0;
+		// var _dragElement;
+		// document.onmousedown = OnMouseDown;
+		// document.onmouseup = OnMouseUp;
+
+		// function OnMouseDown(event){
+		//     document.onmousemove = OnMouseMove;
+		//     dragArea = document.getElementById('thecontents');
+		//     _startX = event.clientX;
+		//     _startY = event.clientY;
+		//     //_offsetX = document.getElementById('div1').offsetLeft;
+		//     _offsetY = dragArea.offsetTop;
+		//     _dragElement = dragArea;
+
+		// }
+
+		// function OnMouseMove(event){
+		//     //_dragElement.style.left = (_offsetX + event.clientX - _startX) + 'px';
+		//     _dragElement.style.top = (_offsetY + event.clientY - _startY) + 'px';
+		// 	alert("down");
+		// }
+
+		// function OnMouseUp(event){
+		//     document.onmousemove = null;
+		//     _dragElement=null;
+		// }
+
+
+
+
+
+
+        function setText(text){
+            // var canvas = document.getElementById("myCanvas");
+            // var ctx = canvas.getContext("2d");
+            // ctx.font = "30px Arial";
+            // ctx.fillText(text,10,50);
+            // ctx.textAlign = "center";
+            // ctx.fillText("Hello World",100,80); //fill inside color
+
+
+
+   //      	var canvas = document.getElementById("myCanvas");
+			// var ctx = canvas.getContext("2d");
+			// ctx.font = "30px Garamond";
+   //          ctx.textAlign = "center";
+			//ctx.strokeText("Hello World",10,50); //stroke outline
+
+
+			var canvas = document.createElement("canvas");
+			var ctx = canvas.getContext("2d");
+			ctx.font = "30px Garamond";
+            ctx.textAlign = "center";
+            ctx.fillText(text,100,80);
+			//... do your canvas drawing....
+			var canCon = document.getElementById("canvasContainer");
+			canCon.style.backgroundImage = "url(" + canvas.toDataURL("image/png") + ")";
+			//$('body'.style.{'background-image':"url(" + Canvas.toDataURL("image/png")+ ")" });
+
+			// var photo = document.getElementsByClassName(
+			//     "photo_class","img",document.getElementById("photo_wrap")
+			// );
+
+			// for (var i=0; i < photo.length; i++) {
+			//   photo[i].onclick = function(){alert("Finaly!");
+			// }
+
+			//or
+
+			//photo[0].onclick = function(){alert("Finaly!");};
+
+			//or 
+
+			// var photo = document.querySelector("#photo_wrap img.photo_class");
+			// photo.onclick = function() {alert("Hello!");};
+
+        }
+
+
+        
+
+        function getDimensions(id){
+            var canvas = document.getElementById(id);
+            //get div height and width
+            alert(canvas.clientHeight);
+            alert(canvas.clientWidth);
+            alert(canvas.offsetHeight);
+            alert(canvas.offsetWidth);
+
+
+        }
+        
+        function clearCanvas(){
+        	//clear the canvas here
+			myCanvasContext.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+
+        // document.getElementById("panToggle").onclick = function(){
+            
+        //     var source = document.getElementById("thecontents");
+        //     setText(source.innerHTML); 
+
+        //     getDimensions("thecontents");
+        // }
+		
+		/*
+			main onclick function to call other functions
+				get id of source div
+				store text to a temporary global variable as back up
+				pass id to customize height and width
+				pass the same id to another function to format text (FONT AND SIZE)
+				create and fill text (MULTILINE ALGORITHM)
+				change background image of canvas container div
+				pan with scrollbar
+				image background in canvas
+				save canvas as image
+			NOTE: all functions to be called must return values
+		*/    
+
+
+
+
+
+
+		// window.onload = function(){
+
+		// 		(function(window, undefined) {
+
+		//     // Handle DOMContentLoaded event
+		//     var domReadyStack = [];
+
+		//     function handleDOMReady(fn) {
+		//         return document.readyState === 'complete' ? fn.call(document) : domReadyStack.push(fn);
+		//     }
+
+		//     document.addEventListener('DOMContentLoaded', function onDOMReady() {
+		//         document.removeEventListener('DOMContentLoaded', onDOMReady);
+		//         while (domReadyStack.length) {
+		//             domReadyStack.shift().call(document);
+		//         }
+		//     });
+
+		//     // ion constructor
+		//     function $(selector) {
+
+		//         if (!(this instanceof $)) {
+		//             return new $(selector);
+		//         }
+
+		//         if (typeof selector === 'function') {
+		//             return handleDOMReady(selector);
+		//         }
+
+		//         // Number of elements in collection
+		//         this.length = 0;
+
+		//         // Nodes collection array
+		//         this.nodes = [];
+
+		//         // HTMLElements and NodeLists are wrapped in nodes array
+		//         if (selector instanceof HTMLElement || selector instanceof NodeList) {
+		//             this.nodes = selector.length > 1 ? [].slice.call(selector) : [selector];
+		//         } else if (typeof selector === 'string') {
+		//             if (selector[0] === '<' && selector[selector.length - 1] === ">") {
+		//                 // Create DOM elements
+		//                 this.nodes = [createNode(selector)];
+		//             } else {
+		//                 // Query DOM
+		//                 this.nodes = [].slice.call(document.querySelectorAll(selector));
+		//             }
+		//         }
+
+		//         if (this.nodes.length) {
+		//             this.length = this.nodes.length;
+		//             for (var i = 0; i < this.nodes.length; i++) {
+		//                 this[i] = this.nodes[i];
+		//             }
+		//         }
+		//     }
+
+		//     function createNode(html) {
+		//         var div = document.createElement('div');
+		//         div.innerHTML = html;
+		//         return div.firstChild;
+		//     }
+
+
+		//     // Methods
+		//     $.fn = $.prototype;
+
+		//     $.fn.each = function(callback) {
+		//         for (var i = 0; i < this.length; i++) {
+		//             callback.call(this[i], this, i);
+		//         }
+		//         return this;
+		//     };
+
+		//     $.fn.addClass = function(classes) {
+		//         return this.each(function() {
+		//             this.className += ' ' + classes;
+		//         });
+		//     };
+
+		//     $.fn.removeClass = function(className) {
+		//         return this.each(function() {
+		//             this.className = this.className.replace(new RegExp('\\b' + className + '\\b', 'g'), '');
+		//         });
+		//     };
+
+		//     $.fn.text = function(str) {
+		//         if (str) {
+		//             return this.each(function() {
+		//                 this.innerText = str;
+		//             });
+		//         }
+		//         return this.length && this[0].innerText;
+		//     };
+
+		//     $.fn.on = function(name, handler) {
+		//         return this.each(function() {
+		//             this.addEventListener(name, handler, false);
+		//         });
+		//     };
+
+		//     window.$ = $;
+
+		// })(window);
+
+
+
+			// ion(".qwe","click", function(event){
+			// 	alert(event.target.value);
+			// });
+			//var poi = document.getElementById('poi');
+			// function $(val){
+			// 	var flag = val.slice(0, 1);
+			// 	val = val.slice(1, val.length);
+
+			// 	if (flag == "#") {
+			// 		return document.getElementById(val);
+			// 	}else if (flag == ".") {
+			// 		var objList = document.getElementsByClassName(val);
+
+			// 		// will not work since return value of document.getElementsByClassName() is not real array
+			// 		// objList.forEach(function(item){
+			// 		// 	return item;
+			// 		// });
+
+			// 		for(i = 0; i < objList.length; i++) {
+			// 			alert(i); 
+			// 			return objList[i];                 
+			// 	  		// (function(i){
+			// 	    // 		objList[i].addEventListener('click', function () { 
+			// 	    //     		// function code here
+			// 	        		// alert(i);           
+			// 	    // 		});                        
+			// 	  		// })
+
+			// 	  		// (i) 
+			// 		}
+
+
+			// 		//return document.getElementsByClassName(val);
+			// 	}
+			// }
+
+			// var images = document.querySelectorAll(".preview-image");
+			// for(i = 0; i < images.length; i++) {                           
+			//   (function(i){
+			//     images[i].addEventListener('click', function () { 
+			//         // function code here               
+			//     });                        
+			//   })(i) 
+			// }
+
+			// bindEvent("#poi").onclick = function(){
+			// 	alert("test1!");
+			// }
+
+			// bindEvent(".qwe").onclick = function(){
+			// 	alert("1");
+			// }
+
+
+			bindEvent("#b2t","click",function(){
+					dragArea = document.getElementById('thecontents');
+					dragArea.scrollTop = 0;
+			});
+
+			bindEvent("#scrollBarToggle","click",function(){
+				var scrollBarStatus = "";
+				// console.log(document.getElementById('scrollBarToggle').value);
+				// console.log(bindEvent("#scrollBarToggle").value);
+				// alert(this.next("audio").html());
+				if($("#scrollBarToggle").value == "Scroll Bar: Visible"){
+					scrollBarStatus = "Scroll Bar: Hidden";
+					$("#thecontents").style.overflow = "hidden";
+				}else{
+					scrollBarStatus = "Scroll Bar: Visible";
+					$("#thecontents").style.overflow = "auto";
+				}
+
+				//use .toggle for shorter code
+				//this == bindEvent("#scrollBarToggle")
+				this.value = scrollBarStatus;
+							
+			});
+
+			bindEvent("#panToggle","click",function(){
+				var panStatus = "";
+				// alert(this.next("audio").html());
+				if(this.value == "Pan Mode: Off"){
+					panStatus = "Pan Mode: On";
+					// bindEvent("#thecontents".style."overflow", "hidden");
+					$("#thecontents").setAttribute("contenteditable", "false");
+					$("#thecontents").setAttribute("unselectable", "on");
+					$("#thecontents").classList.add("grabbable");
+					$("#thecontents").classList.add("noselect");
+					//dom ELEMENT.classList.remove("CLASS_NAME");
+					// bindEvent("#scrollBarToggle").val("Scroll Bar: Hidden");
+
+
+
+				}else{
+					panStatus = "Pan Mode: Off";
+					// bindEvent("#thecontents".style."overflow", "Auto");
+					$("#thecontents").setAttribute("contenteditable", "true");
+					$("#thecontents").setAttribute("unselectable", "off");
+					$("#thecontents").classList.remove("grabbable");
+					$("#thecontents").classList.remove("noselect");
+					// bindEvent("#scrollBarToggle").val("Scroll Bar: Visible");
+
+				}
+
+				this.value = panStatus;
+							
+			});
+
+
+				// bindEvent("#thesubmit","click",function(){
+				// 	var thevalue = bindEvent("#textinput").value;
+				// 	bindEvent("#thecontents").html(thevalue);
+				// 	//bindEvent("#thecontents").append("<br/><input type='number' class='thesize' value='13'>");
+				// 	bindEvent("#thecontents").prop("align","left");
+				// });
+
+
+				bindEvent("#size","change",function(){
+					//alert(bindEvent(".thesize").value);
+					$("#thecontents").style.fontSize = $("#size").value+"px";
+				});
+
+
+				bindEvent("#textAlignment","change",function(){
+					//alert(this.value);
+					$("#thecontents").style.textAlign = this.value;
+				});
+
+
+				function lz(v){
+					return ((v < 10)?"0" +v:v).toString(); //Leading zero for values less than 10
+				}
+
+
+				bindEvent("#saveFile","click",function(){
+					
+					var dt = new Date();
+					var m = dt.getMonth() + 1;
+					var d = dt.getDate();
+
+
+					filename ="PBB " + lz(m) + lz(d) + dt.getFullYear() + ".TXT";
+					text = $("#thecontents").innerHTML;
+					//alert(text);
+					text = text.replace(/<div><br><\/div>/g, '\r\n');
+					//alert(text);
+					text = text.replace(/<\/div><div>/g, '\r\n');
+					//alert(text);
+					text = text.replace(/<div>/g, '\r\n');
+					//alert(text);
+					text = text.replace(/<\/div>/g, "");
+					//alert(text);	
+					text = text.replace(/<br>/g, '\r\n');
+					
+					var pom = document.createElement('a');
+					pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+					pom.setAttribute('download', filename);
+
+					if (document.createEvent) {
+						var event = document.createEvent('MouseEvents');
+						event.initEvent('click', true, true);
+						pom.dispatchEvent(event);
+					}
+					else {
+						pom.click();
+					}
+
+				});
+
+
+				bindEvent("#openFile","change",function(evt){
+					var files = evt.target.files;
+					readTXT(files);
+				});
+
+		    
+
+
+		//=======poi.js contents======= start
+
+		// $(document).ready(function(){
+			
+		// }); //end of document.ready()
+
+
+		function readTXT(files){
+		
+			if (files) {
+				for (var i = 0, f; f = files[i]; i++) {
+					var r = new FileReader();
+
+					r.onload = (function (f) {
+						return function (e) {
+							var contents = e.target.result;
+								contents = contents.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(new RegExp('\r?\n','g'), '<br />');
+								
+								$("#thecontents").innerHTML = contents;
+								$("#openFile").value = ""; //reset the upload button value
+						};
+					})(f);
+
+					r.readAsText(f);
+				}
+			} else {
+				alert("Failed to load files");
+			}
+		}
+
+		// document.getElementById('openFile').onchange = function(evt){
+
+		//  	//Retrieve all the files from the FileList object
+		    
+		//     var files = evt.target.files;
+
+		//     if (files) {
+		//         for (var i = 0, f; f = files[i]; i++) {
+		//             var r = new FileReader();
+		//             r.onload = (function (f) {
+		//                 return function (e) {
+		//                     var contents = e.target.result;
+		//                     alert(contents);
+		//                 };
+		//             })(f);
+		//             r.readAsText(f);
+		//         }
+		//     } else {
+		//         alert("Failed to load files");
+		//     }
+		// }
+
+		bindEvent("#bg","change",function(){
+			document.body.style.background = this.value;
+			
+		});
+		bindEvent("#fg","change",function(){
+			$("#thecontents").style.color = this.value;
+			
+		});
+
+		//=======poi.js contents======= end
+
+		window.onload = function(){
+			
+			// document.getElementById("fileselect").addEventListener("change", FileSelectHandler, false);
+			// document.getElementById("filedrag").addEventListener("drop", FileSelectHandler, false);
+
+			var dropZone = document.getElementById('thecontents');
+			// var dropZone = document.getElementsByTagName('html');
+
+			// Optional.   Show the copy icon when dragging over.  Seems to only work for chrome.
+			dropZone.ondragover = function(e) {
+				//alert("test");
+			    e.stopPropagation();
+			    e.preventDefault();
+			    e.dataTransfer.dropEffect = 'copy';
+			    
+
+			};
+
+			// Get file data on drop
+			dropZone.addEventListener('drop', function(e) {
+			    e.stopPropagation();
+			    e.preventDefault();
+			    var files = e.dataTransfer.files; // Array of all files
+
+			    // for (var i=0, file; file=files[i]; i++) {
+			    //     //if (file.type.match(/image.*/)) {
+			    //         var reader = new FileReader();
+
+			    //         reader.onload = function(e) {
+			    //             // // finished reading file data.
+			    //             // var img = document.createElement('img');
+			    //             // img.src= e2.target.result;
+			    //             // document.body.appendChild(img);
+			    //             var contents = e.target.result;
+			    //             //alert(contents);
+			    //             bindEvent("#thecontents").html();
+			    //         }
+			    //         //document.getElementById("dropZone").prop("visibility", "hidden");
+			    //         reader.readAsText(file); // start reading the file content.
+			    //         // reader.readAsDataURL(file); // start reading the file data.
+			    //     //}
+			    // }
+			    readTXT(files);
+			});
+
+
+			// // cancel event default
+			// // will not open the file in the browser
+			// e.preventDefault();
+
+			// // fetch FileList object
+			// var files = e.target.files || e.dataTransfer.files;
+			// 			
+		}
+
+	</script>
+</html>
